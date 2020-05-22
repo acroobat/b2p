@@ -33,8 +33,6 @@ import getopt
 import signal
 from time import sleep
 
-import logging
-import logging.config
 import base64
 
 class reference(object):
@@ -89,7 +87,6 @@ class piece_server(object):
 			finally:
 				self.lock.release()
 	def pop(self, piece):
-		logger = logging.getLogger("root")
 		event = threading.Event()
 		channel = []
 		self.lock.acquire()
@@ -110,7 +107,6 @@ class piece_server(object):
 					priority = 1
 				self.torrent_handle.piece_priority(p, priority)
 				p += 1
-			logger.debug("downloading of the pieces ["+str(phave)+", "+str(bound1)+") has been turned on")
 			self.array.append((event, channel, piece))
 			self.torrent_handle.set_piece_deadline(piece, 0, libtorrent.deadline_flags_t.alert_when_available)
 		finally:
@@ -139,14 +135,11 @@ class alert_client(threading.Thread):
 
 class torrent_file_bt2p(object):
 	def write(self, dest, r):
-		logger = logging.getLogger("root")
 		request_done = False
 		while (not(request_done)):
 			piece_slice = self.map_file(r.first)
-			logger.info("the piece "+str(piece_slice.piece)+" has been requested")
 			data = self.piece_server.pop(piece_slice.piece)
 			if data is None:
-				logger.warning("pop_piece() is None for the piece "+str(piece_slice.piece))
 				request_done = True
 			else:
 				available_length = range_spec_len(r)
@@ -154,10 +147,7 @@ class torrent_file_bt2p(object):
 				if (end>=len(data)):
 					end = len(data)
 					available_length = len(data)-piece_slice.start
-				logger.debug("writing the data=(piece="+str(piece_slice.piece) \
-					+", interval=["+str(piece_slice.start)+", "+str(end)+"))")
 				dest.write(data[piece_slice.start:end])
-				logger.debug("the data have been written")
 				r.first += available_length
 				request_done = r.first>r.last
 
@@ -206,11 +196,6 @@ http://localhost:17580"""+urllib.request.pathname2url("/"+f.path)+"""""")
 					pass
 			return "".join(r)
 		file_tree_s = flat(t, 0)
-	#	error2s = lambda x: "<li>"+escape_html(x)+"</li>"
-	#	if 0==len(error):
-	#	  error_s = ""
-	#	else:
-	#	  error_s = "<p>error:</p><ol>"+"".join(map(error2s, error))+"</ol>"
 		return self.write_html(file_tree_s)
 
 	def init(self):
@@ -249,12 +234,10 @@ class http_responder_bt2p(http.server.BaseHTTPRequestHandler):
 			if not (content_encoding is None):
 				self.send_header("Content-Encoding: "+content_encoding+"\r\n")
 		hr = self.headers.get("Range")
-		#print("Supertrash",hr)
 		is_whole = True
 		if not (hr is None): # http://deron.meranda.us/python/httpheader/
 			try:
 				hr_parsed = httpheader3.parse_range_header(hr)
-				#hr_parsed = "bytes=0-"
 				try:
 					hr_parsed.fix_to_size(file_size)
 					hr_parsed.coalesce()
@@ -262,7 +245,6 @@ class http_responder_bt2p(http.server.BaseHTTPRequestHandler):
 					self.send_common_header()
 					if hr_parsed.is_single_range():
 						r = hr_parsed.range_specs[0]
-						#print("trashcode",r)
 						send_header_content_type()
 						self.send_header("Content-Length", range_spec_len(r))
 						self.send_header("Content-Range", content_range_header(r))
@@ -300,13 +282,11 @@ class http_responder_bt2p(http.server.BaseHTTPRequestHandler):
 			r.last = file_size-1
 			torrent_file.write(self.wfile, r)
 	def do_GET(self):
-		logger = logging.getLogger("root")
 		try:
 			piece_par_req = "/?piece_par="
 			if "/"==self.path:
 				self.send_response(200)
 				self.send_common_header()
-				#self.send_header("Content-Type", "application/xhtml+xml")
 				s = self.server.torrent.write_html_index(self.server.piece_par.data)
 				self.send_header("Content-Length", str(len(s)))
 				self.end_headers()
@@ -319,7 +299,6 @@ class http_responder_bt2p(http.server.BaseHTTPRequestHandler):
 				tag, value = coerce_piece_par(self.path[len(piece_par_req):])
 				if 0==tag:
 					self.server.piece_par.data = value
-					logger.info("piece_par has been set to "+str(value))
 					s = "ok "+str(value)
 				else:
 					s = "error "+value
@@ -336,7 +315,6 @@ class http_responder_bt2p(http.server.BaseHTTPRequestHandler):
 					torrent_file.piece_server = self.server.piece_server
 					self.read_from_torrent(torrent_file)
 		except IOError as e:
-		#	raise e
 			pass
 
 class http_server_bt2p(ThreadingMixIn, http.server.HTTPServer):
@@ -367,93 +345,9 @@ class resume_alert(object):
 		self.channel = None
 		return channel[0]
 
-class resume_save(object):
-	def __init__(self):
-		super(resume_save, self).__init__()
-		self.lock = threading.Lock()
-		self.last = False
-	def save(self, last):
-		self.lock.acquire()
-		try:
-			if not self.last:
-				logger = logging.getLogger("root")
-				alert = self.resume_alert.pop()
-				if type(alert)==libtorrent.save_resume_data_alert:
-					io.open(self.file_name, "wb").write(libtorrent.bencode(alert.resume_data))
-					logger.info("resume data have been written to: "+self.file_name)
-				else:
-					logger.warning("can not obtain resume data, error code: "+str(alert.error_code))
-				self.last = last
-		finally:
-			self.lock.release()
-
-class resume_timer(threading.Thread):
-	def __init__(self):
-		super(resume_timer, self).__init__()
-		self.daemon = True
-	def run(self):
-		while(True):
-			sleep(60) # configuration. a time in seconds between savings of resume data
-			self.resume_save.save(False)
-
 def error_exit(exit_code, message):
 	sys.stderr.write(message+"\n")
 	sys.exit(exit_code)
-
-class term_handler(object):
-	def __init__(self):
-		super(term_handler, self).__init__()
-		self.h = {}
-		self.set_all()
-	def set_handler(self, name, f):
-		self.h[name] = f
-		self.set_all()
-	def do(self):
-		def get_default(key):
-			def nop():
-				pass
-			if key in self.h:
-				return self.h[key]
-			else:
-				return nop
-		get_default("save_resume")()
-		get_default("scavenge_pid")()
-		sys.exit(os.EX_OK)
-	def set_all(self):
-		def f():
-			self.do()
-		signal.signal(signal.SIGTERM, f)
-
-def main_resume(resume):
-	success = None
-	resume_data = None
-	if not (resume is None):
-		if fs.exists(resume):
-			if fs.isfile(resume):
-				resume_data = io.open(resume, "rb").read()
-				success = True
-			else:
-				success = False
-		else:
-			success = True
-	else:
-		success = True
-	if success:
-		return resume_data
-	else:
-		error_exit(224, "\"--resume\" is not a regular file")
-
-def main_log(l):
-	log, log_conf = l
-	if log:
-		if log_conf is None:
-			log_conf = "/etc/bittorrent2player/logging.conf" # configuration
-		else:
-			error_exit(229, "both \"--log\" and \"--log-conf\" are given, the logging configuration file name is ambiguous")
-	if not (log_conf is None):
-		logging.config.fileConfig(log_conf)
-	else:
-		logging.disable(logging.CRITICAL)
 
 def main_ti(options, ih):
 	info_hash_count, info_hash = ih
@@ -482,19 +376,8 @@ def main_default(options):
 	if not ("save-path" in options):
 		error_exit(226, "\"--save-path\" is mandatory")
 
-def main_torrent_descr(options, th):
-	logger = logging.getLogger("root")
-	def f():
-		logger.debug("shutting down without a resume")
-	th.set_handler("save_resume", f)
-	
+def main_torrent_descr(options):
 	main_default(options)
-	#if "resume" in options:
-	#	resume = options["resume"]
-	#else:
-	#	resume = None
-	#resume_data = main_resume(resume)
-	
 	torrent_session = libtorrent.session()
 	#torrent_session.set_alert_mask(libtorrent.alert.category_t.storage_notification + libtorrent.alert.category_t.status_notification)
 	alert_mask = (
@@ -506,7 +389,7 @@ def main_torrent_descr(options, th):
 	torrent_session.listen_on(6881, 6891)
 	#dht_hosts=[ ('router.bittorrent.com',6881), ('router.utorrent.com',6881), ('dht.transmissionbt.com',6881), ('dht.libtorrent.org',25401), ('dht.aelitis.com',6881)]
 	#for (host,port) in dht_hosts:
-	#	torrent_session.add_dht_router(host,port)
+        #torrent_session.add_dht_router(host,port)
 	torrent_session.start_dht()
 	torrent_session.start_lsd()
 	torrent_session.add_extension('ut_metadata')
@@ -542,7 +425,6 @@ def main_torrent_descr(options, th):
 	alert_client0.torrent_session = torrent_session
 	alert_client0.torrent_handle = torrent_handle
 	alert_client0.piece_server = piece_server0
-		#alert_client0.resume_alert = None
 	alert_client0.start()
 	
 	r = torrent_read_bt2p()
@@ -559,29 +441,24 @@ def main_torrent_descr(options, th):
 	try:
 		http_server.serve_forever()
 	except KeyboardInterrupt:
-		th.do()
+		print("An exception occurred")
 
-def main_options(options, l, ih, th):
-	main_log(l)
+def main_options(options, ih):
 	main_ti(options, ih)
-	main_torrent_descr(options, th)
+	main_torrent_descr(options)
 
 def main(argv=None):
-	th = term_handler()
 	if argv is None:
 		argv = sys.argv
 	try:
 		crude_options, args = getopt.getopt(argv[1:], ""
 			, ["resume=", "save-path=", "piece-par=", "domain-name=", "port="
-			, "log", "log-conf="
 			, "hash-file=", "info-hash-value-base16=", "info-hash-value-base32=", "info-hash-tracker="])
 	except getopt.error as error:
 		error_exit(221, "the option "+error.opt+" is incorrect because "+error.msg)
 	if []!=args:
 		error_exit(222, "only options are allowed, not arguments")
 	options = {}
-	log = False
-	log_conf = None
 	info_hash_count = 0
 	info_hash = None
 	options["info-hash-tracker"] = []
@@ -606,17 +483,13 @@ def main(argv=None):
 				options["piece-par"] = value
 			else:
 				error_exit(tag, value)
-		elif "--log"==o:
-			log = True
-		elif "--log-conf"==o:
-			log_conf = a
 		elif "--domain-name"==o:
 			options["domain-name"] = a
 		elif "--port"==o:
 			options["port"] = a
 		else:
 			error_exit(223, "an unknown option is given")
-	main_options(options, (log, log_conf), (info_hash_count, info_hash), th)
+	main_options(options, (info_hash_count, info_hash))
 
 if __name__ == "__main__":
 	main()
