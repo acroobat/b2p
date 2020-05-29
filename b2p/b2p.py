@@ -16,10 +16,10 @@ You should have received a copy of the GNU Lesser General Public
 License along with this library; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 """
+#TODO :
 
 import http.server
 from socketserver import ThreadingMixIn
-import httpheader3
 import urllib.request, urllib.parse, urllib.error
 from mimetypes import guess_type as guess_mime_type
 import libtorrent
@@ -30,17 +30,10 @@ import os.path as fs
 import sys
 import io
 import getopt
-import signal
-from time import sleep
-
 import base64
 
 class reference(object):
 	pass
-
-#class temp_storage(libtorrent.storage_interface)
-#
-#	   return temp_storage
 
 def split_path_list(path):
 	r = []
@@ -51,19 +44,6 @@ def split_path_list(path):
 		path = y
 		r.append(x)
 	return r
-
-def range_spec_len(r):
-	return r.last+1-r.first
-
-def coerce_piece_par(s):
-	try:
-		b = int(s)
-	except ValueError:
-		return (227, "\"--piece-par\" is not an integer")
-	if b<=0:
-		return (228, "\"--piece-par\" must be positive")
-	else:
-		return (0, b)
 
 class piece_server(object):
 	def __init__(self):
@@ -91,7 +71,7 @@ class piece_server(object):
 		channel = []
 		self.lock.acquire()
 		try:
-			piece_par = self.piece_par.data
+			piece_par = round(self.torrent_info.metadata_size() / 10000) + 1
 			def bound_in_torrent(start):
 				return min(self.torrent_info.num_pieces(), start+piece_par)
 			bound0 = bound_in_torrent(piece)
@@ -129,32 +109,29 @@ class alert_client(threading.Thread):
 			if a:
 				if (type(a[0]) == libtorrent.read_piece_alert):
 					self.piece_server.push(a[0])
-				if (type(a[0]) in [libtorrent.save_resume_data_alert, libtorrent.save_resume_data_failed_alert]
-					and not (self.resume_alert is None)):
-					self.resume_alert.push(a[0])
 
 class torrent_file_bt2p(object):
-	def write(self, dest, r):
+	def write(self, dest, rangespec, startpos, endpos):
 		request_done = False
 		while (not(request_done)):
-			piece_slice = self.map_file(r.first)
+			piece_slice = self.map_file(startpos)
 			data = self.piece_server.pop(piece_slice.piece)
 			if data is None:
 				request_done = True
 			else:
-				available_length = range_spec_len(r)
+				available_length = rangespec
 				end = piece_slice.start + available_length
 				if (end>=len(data)):
 					end = len(data)
 					available_length = len(data)-piece_slice.start
 				dest.write(data[piece_slice.start:end])
-				r.first += available_length
-				request_done = r.first>r.last
+				startpos += available_length
+				request_done = startpos>endpos
 
 class torrent_read_bt2p(object):
 	def write_html(self, s):
 		return """#EXTM3U"""+s
-	def write_html_index(self, piece_par):
+	def write_html_index(self):
 		t = {}
 		error = []
 		for f in self.torrent_info.files():
@@ -212,100 +189,24 @@ http://localhost:17580"""+urllib.request.pathname2url("/"+f.path)+"""""")
 		return None
 
 class http_responder_bt2p(http.server.BaseHTTPRequestHandler):
-	def log_message(self, format, *args):
-		pass
-	def send_common_header(self):
-		self.send_header("Accept-Ranges", "bytes")
-		self.send_header("ETag", self.server.torrent.info_hash)
 	def read_from_torrent(self, torrent_file):
 		file_size = torrent_file.size
-		def content_range_header(r):
-			return "bytes "+str(r.first)+"-"+str(r.last)+"/"+str(file_size)
-		content_type, content_encoding = torrent_file.content_type
-		if content_type is None:
-			content_type = "application/octet-stream"
-			content_encoding = None
-		def send_header_content_type():
-			self.send_header("Content-Type", content_type)
-			if not (content_encoding is None):
-				self.send_header("Content-Encoding", content_encoding)
-		def write_content_type():
-			self.wfile.write("Content-Type: "+content_type+"\r\n")
-			if not (content_encoding is None):
-				self.send_header("Content-Encoding: "+content_encoding+"\r\n")
 		hr = self.headers.get("Range")
-		is_whole = True
-		if not (hr is None): # http://deron.meranda.us/python/httpheader/
-			try:
-				hr_parsed = httpheader3.parse_range_header(hr)
-				try:
-					hr_parsed.fix_to_size(file_size)
-					hr_parsed.coalesce()
-					self.send_response(206)
-					self.send_common_header()
-					if hr_parsed.is_single_range():
-						r = hr_parsed.range_specs[0]
-						send_header_content_type()
-						self.send_header("Content-Length", range_spec_len(r))
-						self.send_header("Content-Range", content_range_header(r))
-						self.end_headers()
-						torrent_file.write(self.wfile, r)
-					else: # this code is not tested
-						import random, string
-						boundary = '--------' + ''.join([ random.choice(string.letters) for i in range(32) ])
-						self.send_header("Content-Type", "multipart/byteranges; boundary="+boundary)
-						self.end_headers()
-						for r in hr_parsed.range_specs:
-							self.wfile.write(boundary+"\r\n")
-							write_content_type()
-							self.wfile.write("Content-Length: "+str(range_spec_len(r))+"\r\n")
-							self.wfile.write("Content-Range: "+content_range_header(r)+"\r\n\r\n")
-							torrent_file.write(self.wfile, r)
-							self.wfile.write("\r\n"+boundary+"--\r\n")
-					is_whole = False
-				except httpheader3.RangeUnsatisfiableError:
-					self.send_response(416)
-					self.send_common_header()
-					self.send_header("Content-Range", "*/"+str(file_size))
-					self.end_headers()
-					is_whole = False
-			except httpheader3.ParseError:
-				pass
-		if is_whole:
-			self.send_response(200)
-			self.send_common_header()
-			send_header_content_type()
-			self.send_header("Content-Length", str(file_size))
+		if not (hr is None):
+			startpos = ''.join(filter(lambda i: i.isdigit(), hr)) 
+			rangespec = file_size-int(startpos)
+			self.send_header("Content-Length", rangespec)
+			self.send_header("Content-Range", "bytes "+startpos+"-"+str(file_size-1)+"/"+str(file_size))
 			self.end_headers()
-			r = httpheader3.range_spec()
-			r.first = 0
-			r.last = file_size-1
-			torrent_file.write(self.wfile, r)
+			torrent_file.write(self.wfile, rangespec, int(startpos), file_size-1)
 	def do_GET(self):
 		try:
-			piece_par_req = "/?piece_par="
 			if "/"==self.path:
-				self.send_response(200)
-				self.send_common_header()
-				s = self.server.torrent.write_html_index(self.server.piece_par.data)
+				s = self.server.torrent.write_html_index()
 				self.send_header("Content-Length", str(len(s)))
 				self.end_headers()
 				sd = s.encode()
 				self.wfile.write(sd)
-			elif self.path[0:len(piece_par_req)]==piece_par_req:
-				self.send_response(200)
-				self.send_common_header()
-				self.send_header("Content-Type", "text/plain")
-				tag, value = coerce_piece_par(self.path[len(piece_par_req):])
-				if 0==tag:
-					self.server.piece_par.data = value
-					s = "ok "+str(value)
-				else:
-					s = "error "+value
-				s += "\r\n"
-				self.send_header("Content-Length", str(len(s)))
-				self.end_headers()
-				self.wfile.write(s)
 			else:
 				torrent_file = self.server.torrent.find_file(self.path)
 				if not torrent_file:
@@ -320,66 +221,23 @@ class http_responder_bt2p(http.server.BaseHTTPRequestHandler):
 class http_server_bt2p(ThreadingMixIn, http.server.HTTPServer):
 	pass
 
-class resume_alert(object):
-	def __init__(self):
-		super(resume_alert, self).__init__()
-		self.lock = threading.Lock()
-	def push(self, alert):
-		self.lock.acquire()
-		try:
-			self.channel.append(alert)
-			self.event.set()
-		finally:
-			self.lock.release()
-	def pop(self):
-		event = threading.Event()
-		channel = []
-		self.lock.acquire()
-		try:
-			self.channel = channel
-			self.event = event
-			self.torrent_handle.save_resume_data()
-		finally:
-			self.lock.release()
-		event.wait()
-		self.channel = None
-		return channel[0]
-
 def error_exit(exit_code, message):
 	sys.stderr.write(message+"\n")
 	sys.exit(exit_code)
 
-def main_ti(options, ih):
-	info_hash_count, info_hash = ih
-	if not ("hash-file" in options):
-		if info_hash is None:
-			error_exit(225,  "\"--hash-file\" or \"--info-hash-value-*\" is mandatory")
-		else:
-			if 1<info_hash_count:
-				error_exit(235, "too many \"--info-hash-value-*\" options are given")
-			else:
-				options["info-hash"] = info_hash
-	else:
-		if not (info_hash is None):
-			error_exit(234, "giving both \"--hash-file\" and \"--info-hash-value-*\" is not allowed")
-	if info_hash is None and "info-hash-tracker" in options:
-		if not (len(options["info-hash-tracker"])==0):
-			error_exit(236, "\"--info-hash-tracker\" without \"--info-hash-value-*\" makes no sense")
-	
 def main_default(options):
 	if not ("domain-name" in options):
-		options["domain-name"] = "127.0.0.1" # configuration
+		options["domain-name"] = "127.0.0.1"
 	if not ("port" in options):
-		options["port"] = 17580 # configuration
-	if not ("piece-par" in options):
-		options["piece-par"] = 4 # configuration
+		options["port"] = 17580
 	if not ("save-path" in options):
 		error_exit(226, "\"--save-path\" is mandatory")
+	if not ("hash-file" in options):
+		error_exit(226, "\"--hash-file\" is mandatory")
 
 def main_torrent_descr(options):
 	main_default(options)
 	torrent_session = libtorrent.session()
-	#torrent_session.set_alert_mask(libtorrent.alert.category_t.storage_notification + libtorrent.alert.category_t.status_notification)
 	alert_mask = (
 		libtorrent.alert.category_t.storage_notification
 		| libtorrent.alert.category_t.status_notification
@@ -387,9 +245,9 @@ def main_torrent_descr(options):
 
 	torrent_session.apply_settings({'alert_mask': alert_mask})
 	torrent_session.listen_on(6881, 6891)
-	#dht_hosts=[ ('router.bittorrent.com',6881), ('router.utorrent.com',6881), ('dht.transmissionbt.com',6881), ('dht.libtorrent.org',25401), ('dht.aelitis.com',6881)]
+	torrent_session.dht_nodes=[ ('router.bittorrent.com',6881), ('router.utorrent.com',6881), ('dht.transmissionbt.com',6881), ('dht.libtorrent.org',25401), ('dht.aelitis.com',6881)]
 	#for (host,port) in dht_hosts:
-        #torrent_session.add_dht_router(host,port)
+	#	 torrent_session.add_dht_nodes(host,port)
 	torrent_session.start_dht()
 	torrent_session.start_lsd()
 	torrent_session.add_extension('ut_metadata')
@@ -400,25 +258,14 @@ def main_torrent_descr(options):
 	torrent_descr = {"save_path": options["save-path"]}
 	if "hash-file" in options:
 		torrent_info = libtorrent.torrent_info(options["hash-file"])
-
-				#magnet = libtorrent.parse_magnet_uri(options["hash-file"])
-				#torrent_info = libtorrent.bencode(magnet)
-				#torrent_descr["trackers"] = magnet.trackers
-				#torrent_descr["info_hash"] = libtorrent.bencode(torrent_info.info_hash)
-				#torrent_descr["tracker_tiers"] = magnet.tracker_tiers
-				#torrent_descr["name"] = magnet.name
-				#torrent_descr["dht_nodes"] = magnet.dht_nodes
 		torrent_descr["ti"] = torrent_info
 	torrent_handle = torrent_session.add_torrent(torrent_descr)
-	torrent_handle.set_ratio(0.5) # configuration. upload_speed/download_speed
 	
 	piece_par_ref0 = reference()
-	piece_par_ref0.data = options["piece-par"]
 	
 	piece_server0 = piece_server()
 	piece_server0.torrent_handle = torrent_handle
 	piece_server0.torrent_info = torrent_info
-	piece_server0.piece_par = piece_par_ref0
 	piece_server0.init()
 
 	alert_client0 = alert_client()
@@ -435,7 +282,6 @@ def main_torrent_descr(options):
 	http_server = http_server_bt2p((options["domain-name"], options["port"]), http_responder_bt2p)
 	http_server.daemon_threads = True
 	http_server.torrent = r
-	http_server.piece_par = piece_par_ref0
 	http_server.piece_server = piece_server0
 	
 	try:
@@ -443,53 +289,30 @@ def main_torrent_descr(options):
 	except KeyboardInterrupt:
 		print("An exception occurred")
 
-def main_options(options, ih):
-	main_ti(options, ih)
-	main_torrent_descr(options)
-
 def main(argv=None):
 	if argv is None:
 		argv = sys.argv
 	try:
 		crude_options, args = getopt.getopt(argv[1:], ""
-			, ["resume=", "save-path=", "piece-par=", "domain-name=", "port="
-			, "hash-file=", "info-hash-value-base16=", "info-hash-value-base32=", "info-hash-tracker="])
+			, ["save-path=", "domain-name=", "port="
+			, "hash-file="])
 	except getopt.error as error:
 		error_exit(221, "the option "+error.opt+" is incorrect because "+error.msg)
 	if []!=args:
 		error_exit(222, "only options are allowed, not arguments")
 	options = {}
-	info_hash_count = 0
-	info_hash = None
-	options["info-hash-tracker"] = []
 	for o, a in crude_options:
-		if "--resume"==o:
-			options["resume"] = a
-		elif "--hash-file"==o:
+		if "--hash-file"==o:
 			options["hash-file"] = a
-		elif o.startswith("--info-hash-value-"):
-			info_hash_count += 1
-			if "--info-hash-value-base16"==o:
-				info_hash = base64.b16decode(a)
-			elif "--info-hash-value-base32"==o:
-				info_hash = base64.b32decode(a)
-		elif "--info-hash-tracker"==o:
-			options["info-hash-tracker"].append(a)
 		elif "--save-path"==o:
 			options["save-path"] = a
-		elif "--piece-par"==o:
-			tag, value = coerce_piece_par(a)
-			if 0==tag:
-				options["piece-par"] = value
-			else:
-				error_exit(tag, value)
 		elif "--domain-name"==o:
 			options["domain-name"] = a
 		elif "--port"==o:
 			options["port"] = a
 		else:
 			error_exit(223, "an unknown option is given")
-	main_options(options, (info_hash_count, info_hash))
+	main_torrent_descr(options)
 
 if __name__ == "__main__":
 	main()
