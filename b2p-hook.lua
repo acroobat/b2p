@@ -20,7 +20,7 @@ mp.add_hook("on_load", 50, function ()
     utils.subprocess({ args = { 'curl', '-s', url, '-o', '/tmp/b2pgen.torrent' }})
     url = "/tmp/b2pgen.torrent"
 	end
-       local res = utils.subprocess({ args = { "pgrep", "-f", pathscript.. '/b2p3.py' }})
+       local res = utils.subprocess({ args = { "pgrep", "-f", pathscript.. '/b2p.py' }})
 	    local out = (res["stdout"])
         if (out:find("[%d]+") == 1) then
        utils.subprocess({ args = { 'killall', '-9', out}})
@@ -38,7 +38,7 @@ mp.add_hook("on_unload", 10, function ()
       rar = mp.get_property("playlist")
 	  rar = rar:gsub('[%p%c%s]', '')
 	if not (rar:find("filenamehttplocalhost17580") == 1) then
-    os.execute("kill -9 $(pgrep -f 'python " .. pathscript.. "/b2p3.py')") 
+    os.execute("kill -9 $(pgrep -f 'python " .. pathscript.. "/b2p.py')") 
     b2p_is_running = false
 	  end
       end
@@ -46,7 +46,7 @@ end)
 
 function my_fn()
     if (b2p_is_running) then
-       os.execute("kill -9 $(pgrep -f 'python " .. pathscript.. "/b2p3.py')") 
+       os.execute("kill -9 $(pgrep -f 'python " .. pathscript.. "/b2p.py')") 
 end
 end
 
