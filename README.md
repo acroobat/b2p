@@ -4,18 +4,18 @@ Fork from dead http://www.beroal.in.ua/prg/bittorrent2player/
 The original author is beroal 
 
 
-<b>Difference:</b>
+<b>Changes:</b>
 
 <ul>
-<li>Swithed from python2 to python3</li>
+<li>Switched from python2 to python3</li>
 <li>Switched from libtorrent 1.1 to 1.2</li>
 <li>Logger is deleted</li>
-<li>Http request is just simple m3u playlist</li>
+<li>Http respond is just simple m3u playlist</li>
 </ul>
 
-<b>Requirement</b>
+<b>Requirements:</b>
 <ul>
-<li>libtorrent with python bindings(>=1.2)</li>
+<li>libtorrent with python binding(>=1.2)</li>
 </ul>
 
 
@@ -25,7 +25,7 @@ Lua script for mpv
 
 <b>Configuration: </b>
 
-You need to edit in `b2p-hook.lua`:
+You need to edit `b2p-hook.lua`:
 
 `pathscript` - b2p directory path
 
@@ -36,7 +36,7 @@ You need to edit in `b2p-hook.lua`:
 
 <b>Usage:</b>
 
-`mpv myfile.torrent` or `mpv magnet://mymagnet`
+`mpv Big_Buck_Bunny.torrent` or `mpv magnet://big_buck_bunny`
 
 
 ## Hope it works
