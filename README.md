@@ -1,5 +1,5 @@
 # b2p
-Fork from dead http://www.beroal.in.ua/prg/bittorrent2player/
+Fork of http://www.beroal.in.ua/prg/bittorrent2player/
 
 The original author is beroal 
 
