@@ -27,7 +27,7 @@ mp.add_hook("on_load", 50, function ()
        end
 
         utils.subprocess_detached({ args = { 'python', pathscript.. '/b2p.py', '--save-path='..savepath , '--hash-file=' ..url}})
-       utils.subprocess({ args = { 'curl', '-s', "http://localhost:17580", '--retry', '10', '--retry-connrefused', '10', '--retry-delay', '2'}})
+       utils.subprocess({ args = { 'curl', '-s', "http://localhost:17580", '--retry', '10', '--retry-connrefused', '--retry-delay', '2'}})
         mp.set_property("stream-open-filename", "http://localhost:17580")
         b2p_is_running = true
     end
