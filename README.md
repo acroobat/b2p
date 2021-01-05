@@ -39,4 +39,3 @@ You need to edit `b2p-hook.lua`:
 `mpv Big_Buck_Bunny.torrent` or `mpv magnet://big_buck_bunny`
 
 
-## Hope it works
