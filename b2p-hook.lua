@@ -11,11 +11,7 @@ mp.add_hook("on_load", 50, function ()
     if (url:find("b2p://") == 1) then 
             url = url:sub(7)
     end
-	if (url:find("magnet:") == 1) then
-    utils.subprocess({ args = { 'python', pathscript.. '/mag2tor.py', url}})
-    url = "/tmp/b2pgen.torrent"
-	end
-	if(url:find("[%a%d%p]+%.torrent") == 1) then 
+	if(url:find("[%a%d%p]+%.torrent") == 1) or (url:find("magnet:") == 1) then 
 	if(url:find("http") == 1) then
     utils.subprocess({ args = { 'curl', '-s', url, '-o', '/tmp/b2pgen.torrent' }})
     url = "/tmp/b2pgen.torrent"
