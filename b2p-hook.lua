@@ -1,7 +1,7 @@
 local utils = require 'mp.utils'
 local msg = require 'mp.msg'
 local pathscript = '/home/damir/b2p'
-local savepath = '/home/damir/files'
+local savepath = '/home/damir/b2pfiles'
 
 local b2p_is_running = false
 
@@ -9,41 +9,41 @@ local b2p_is_running = false
 mp.add_hook("on_load", 50, function ()
     local url = mp.get_property("stream-open-filename")
     if (url:find("b2p://") == 1) then 
-            url = url:sub(7)
+        url = url:sub(7)
     end
 	if(url:find("[%a%d%p]+%.torrent") == 1) or (url:find("magnet:") == 1) then 
-	if(url:find("http") == 1) then
-    utils.subprocess({ args = { 'curl', '-s', url, '-o', '/tmp/b2pgen.torrent' }})
-    url = "/tmp/b2pgen.torrent"
-	end
-       local res = utils.subprocess({ args = { "pgrep", "-f", pathscript.. '/b2p.py' }})
-	    local out = (res["stdout"])
+        if(url:find("http") == 1) then
+            utils.subprocess({ args = { 'curl', '-s', url, '-o', '/tmp/b2pgen.torrent' }})
+            url = "/tmp/b2pgen.torrent"
+        end
+        local res = utils.subprocess({ args = { "pgrep", "-f", pathscript.. '/b2p.py' }})
+        local out = (res["stdout"])
         if (out:find("[%d]+") == 1) then
-       utils.subprocess({ args = { 'killall', '-9', out}})
-       end
+            utils.subprocess({ args = { 'killall', '-9', out}})
+        end
 
         utils.subprocess_detached({ args = { 'python', pathscript.. '/b2p.py', '--save-path='..savepath , '--hash-file=' ..url}})
-       utils.subprocess({ args = { 'curl', '-s', "http://localhost:17580", '--retry', '10', '--retry-connrefused', '--retry-delay', '2'}})
+        utils.subprocess({ args = { 'curl', '-s', "http://localhost:17580", '--retry', '10', '--retry-connrefused', '--retry-delay', '2'}})
         mp.set_property("stream-open-filename", "http://localhost:17580")
         b2p_is_running = true
     end
 end) 
 
 mp.add_hook("on_unload", 10, function ()
-	if (b2p_is_running) then
-      rar = mp.get_property("playlist")
-	  rar = rar:gsub('[%p%c%s]', '')
-	if not (rar:find("filenamehttplocalhost17580") == 1) then
-    os.execute("kill -9 $(pgrep -f 'python " .. pathscript.. "/b2p.py')") 
-    b2p_is_running = false
-	  end
-      end
+    if (b2p_is_running) then
+        rar = mp.get_property("playlist")
+        rar = rar:gsub('[%p%c%s]', '')
+        if not (rar:find("filenamehttplocalhost17580") == 1) then
+            os.execute("kill -9 $(pgrep -f 'python " .. pathscript.. "/b2p.py')") 
+            b2p_is_running = false
+        end
+    end
 end)
 
-function my_fn()
+function destroy()
     if (b2p_is_running) then
-       os.execute("kill -9 $(pgrep -f 'python " .. pathscript.. "/b2p.py')") 
-end
+        os.execute("kill -9 $(pgrep -f 'python " .. pathscript.. "/b2p.py')") 
+    end
 end
 
-mp.register_event("shutdown", my_fn)
+mp.register_event("shutdown", destroy)
