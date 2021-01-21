@@ -1,18 +1,6 @@
 # b2p
 Fork of http://www.beroal.in.ua/prg/bittorrent2player/
 
-The original author is beroal 
-
-
-<b>Changes:</b>
-
-<ul>
-<li>Switched from python2 to python3</li>
-<li>Switched from libtorrent 1.1 to 1.2</li>
-<li>Logger is deleted</li>
-<li>Http respond is just simple m3u playlist</li>
-</ul>
-
 <b>Requirements:</b>
 <ul>
 <li>libtorrent with python binding(>=1.2)</li>
