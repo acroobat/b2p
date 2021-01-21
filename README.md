@@ -36,6 +36,10 @@ You need to edit `b2p-hook.lua`:
 
 <b>Usage:</b>
 
-`mpv Big_Buck_Bunny.torrent` or `mpv magnet://big_buck_bunny`
+`mpv Big_Buck_Bunny.torrent`
+
+or
+
+`mpv magnet:?xt=urn:btih:a3fbda1961fbc908026ec7cc4569d5fbef840c1e&dn=big_buck_bunny_1080p_surround.avi`
 
 
