@@ -19,6 +19,8 @@ You need to edit `b2p-hook.lua`:
 
 `savepath` - directory where temporary files will be stored 
 
+`deletefiles` - whether to delete files 
+
 
  
 
