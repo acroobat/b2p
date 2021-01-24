@@ -9,7 +9,7 @@ version 2.1 of the License, or (at your option) any later version.
 
 This library is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
 Lesser General Public License for more details.
 
 You should have received a copy of the GNU Lesser General Public
@@ -21,6 +21,7 @@ import http.server
 from socketserver import ThreadingMixIn
 import urllib.request, urllib.parse, urllib.error
 from mimetypes import guess_type as guess_mime_type
+from distutils.util import strtobool
 import libtorrent
 
 import threading
@@ -208,6 +209,9 @@ class http_responder_bt2p(http.server.BaseHTTPRequestHandler):
                 self.end_headers()
                 sd = s.encode()
                 self.wfile.write(sd)
+            elif "/?exit=yes"==self.path:
+                self.torrent_session.remove_torrent(self.torrent_handle, strtobool(self.delete_files))
+                os._exit(0)
             else:
                 torrent_file = self.server.torrent.find_file(self.path)
                 if not torrent_file:
@@ -231,6 +235,8 @@ def main_default(options):
         options["domain-name"] = "127.0.0.1"
     if not ("port" in options):
         options["port"] = 17580
+    if not ("delete-files" in options):
+        options["delete-files"] = True
     if not ("save-path" in options):
         error_exit(226, "\"--save-path\" is mandatory")
     if not ("hash-file" in options):
@@ -238,7 +244,11 @@ def main_default(options):
 
 def main_torrent_descr(options):
     main_default(options)
-    torrent_session = libtorrent.session()
+    sett = {'enable_lsd': True,
+    'enable_dht': True,
+    'enable_upnp': True,
+    'enable_natpmp': True,}
+    torrent_session = libtorrent.session(sett)
     alert_mask = (
         libtorrent.alert.category_t.storage_notification
         | libtorrent.alert.category_t.status_notification
@@ -281,6 +291,9 @@ def main_torrent_descr(options):
             torrent_descr["ti"] = torrent_info
             torrent_handle = torrent_session.add_torrent(torrent_descr)
     
+    http_responder_bt2p.torrent_session = torrent_session
+    http_responder_bt2p.torrent_handle = torrent_handle
+    http_responder_bt2p.delete_files = options["delete-files"]
     piece_par_ref0 = reference()
     
     piece_server0 = piece_server()
@@ -315,7 +328,7 @@ def main(argv=None):
     try:
         crude_options, args = getopt.getopt(argv[1:], ""
             , ["save-path=", "domain-name=", "port="
-            , "hash-file="])
+            , "hash-file=", "delete-files="])
     except getopt.error as error:
         error_exit(221, "the option "+error.opt+" is incorrect because "+error.msg)
     if []!=args:
@@ -330,6 +343,8 @@ def main(argv=None):
             options["domain-name"] = a
         elif "--port"==o:
             options["port"] = a
+        elif "--delete-files"==o:
+            options["delete-files"] = a
         else:
             error_exit(223, "an unknown option is given")
     main_torrent_descr(options)
