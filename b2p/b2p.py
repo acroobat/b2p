@@ -104,10 +104,13 @@ class alert_client(threading.Thread):
         while(True):
             self.torrent_session.wait_for_alert(1000)
             a = self.torrent_session.pop_alerts()
-            s = self.torrent_handle.status()     
-            state_str = ['queued', 'checking', 'downloading metadata', 'downloading', 'finished', 'seeding', 'allocating', 'checking fastresume']
-            print('\r%.2f%% complete (down: %.1f kb/s up: %.1f kB/s peers: %d) %s' % (s.progress * 100, s.download_rate / 1000, s.upload_rate / 1000, s.num_peers, state_str[s.state]), end=' ')
-            sys.stdout.flush()
+            try:
+                s = self.torrent_handle.status()     
+                state_str = ['queued', 'checking', 'downloading metadata', 'downloading', 'finished', 'seeding', 'allocating', 'checking fastresume']
+                print('\r%.2f%% complete (down: %.1f kb/s up: %.1f kB/s peers: %d) %s' % (s.progress * 100, s.download_rate / 1000, s.upload_rate / 1000, s.num_peers, state_str[s.state]), end=' ')
+                sys.stdout.flush()
+            except RuntimeError:
+                pass
             if a:
                 if (type(a[0]) == libtorrent.read_piece_alert):
                     self.piece_server.push(a[0])
@@ -211,7 +214,10 @@ class http_responder_bt2p(http.server.BaseHTTPRequestHandler):
                 self.wfile.write(sd)
             elif "/?exit=yes"==self.path:
                 self.torrent_session.remove_torrent(self.torrent_handle, strtobool(self.delete_files))
-                os._exit(0)
+                t = threading.Thread(target=self.http_server.shutdown)
+                t.daemon = True
+                t.start()
+               # sys.exit()
             else:
                 torrent_file = self.server.torrent.find_file(self.path)
                 if not torrent_file:
@@ -291,9 +297,6 @@ def main_torrent_descr(options):
             torrent_descr["ti"] = torrent_info
             torrent_handle = torrent_session.add_torrent(torrent_descr)
     
-    http_responder_bt2p.torrent_session = torrent_session
-    http_responder_bt2p.torrent_handle = torrent_handle
-    http_responder_bt2p.delete_files = options["delete-files"]
     piece_par_ref0 = reference()
     
     piece_server0 = piece_server()
@@ -317,6 +320,10 @@ def main_torrent_descr(options):
     http_server.torrent = r
     http_server.piece_server = piece_server0
     
+    http_responder_bt2p.torrent_session = torrent_session
+    http_responder_bt2p.torrent_handle = torrent_handle
+    http_responder_bt2p.delete_files = options["delete-files"]
+    http_responder_bt2p.http_server = http_server
     try:
         http_server.serve_forever()
     except KeyboardInterrupt:
