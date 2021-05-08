@@ -3,7 +3,7 @@ Fork of http://www.beroal.in.ua/prg/bittorrent2player/
 
 <b>Requirements:</b>
 <ul>
-<li>libtorrent with python binding(>=1.2)</li>
+<li>libtorrent with python binding(>=2.0)</li>
 </ul>
 
 
