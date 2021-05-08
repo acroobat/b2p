@@ -266,7 +266,7 @@ def main_torrent_descr(options):
                 raise Exception("Unable to parse infohash")
 
             trackers = magnet.trackers
-            torrent_handle = torrent_session.add_torrent({'info_hash': info_hash, 'trackers': trackers, "save_path": options["save-path"]})
+            torrent_handle = torrent_session.add_torrent({'info_hashes': info_hash, 'trackers': trackers, "save_path": options["save-path"]})
             dots=0
             while not torrent_handle.has_metadata():
                 dots += 1
