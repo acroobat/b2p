@@ -13,13 +13,11 @@ Lua script for mpv
 
 <b>Configuration: </b>
 
-You need to edit `b2p-hook.lua`:
-
 `pathscript` - b2p directory path
 
 `savepath` - directory where temporary files will be stored 
 
-`deletefiles` - whether to delete files 
+`deletefiles` - whether to delete files
 
 
  
