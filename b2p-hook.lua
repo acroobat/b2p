@@ -1,7 +1,7 @@
 local utils = require 'mp.utils'
 local msg = require 'mp.msg'
-local pathscript = '/home/damir/b2p'
-local savepath = '/home/damir/b2pfiles'
+local pathscript = '~/.local/bin/b2p'
+local savepath = '/tmp'
 local deletefiles = 'true'
 
 local b2p_is_running = false
