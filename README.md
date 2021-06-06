@@ -1,6 +1,8 @@
 # b2p
 Fork of http://www.beroal.in.ua/prg/bittorrent2player/
 
+`pip install git+https://github.com/acroobat/b2p.git`
+
 <b>Requirements:</b>
 <ul>
 <li>libtorrent with python binding(>=2.0)</li>
