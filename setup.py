@@ -1,25 +1,25 @@
 #!/usr/bin/python3
-import setuptools
 
-import os.path
-import warnings
-import sys
+#import setuptools
+from distutils.core import setup
 
-if setuptools_available:
-        params['scripts'] = ['bin/b2p']
+
+#import os.path
+#import warnings
+#import sys
+
 
 setup(
     name='b2p',
-    version=__version__,
-    description=DESCRIPTION,
-    long_description=LONG_DESCRIPTION,
-    url='https://github.com/acroobat/youtube-dl',
+    version='2021-06-06',
+    description='stream trorrent',
+    long_description='fork',
+    url='https://github.com/acroobat/b2p',
     author='Roman Beslik',
     author_email='rabeslik@gmail.com',
     maintainer='acroobat',
     maintainer_email='acroobat@mail.ru',
-    license='Unlicense',
-    packages=[
-        'b2p'],
+    license='LGPL',
+    packages=['b2p'],
+    scripts=['bin/b2p']
 )
-
