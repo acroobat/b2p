@@ -1,6 +1,6 @@
 local utils = require 'mp.utils'
 local msg = require 'mp.msg'
-local pathscript = '~/.local/bin/b2p'
+local pathscript =  os.getenv("HOME")..'/.local/bin/b2p'
 local savepath = '/tmp'
 local deletefiles = 'true'
 
