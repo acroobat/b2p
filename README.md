@@ -1,17 +1,26 @@
 # b2p
 Fork of http://www.beroal.in.ua/prg/bittorrent2player/
 
-`pip install git+https://github.com/acroobat/b2p.git`
-
 <b>Requirements:</b>
 <ul>
 <li>libtorrent with python binding(>=2.0)</li>
 </ul>
 
+<b>Installation:</b>
+
+`pip install git+https://github.com/acroobat/b2p.git`
+
+<b>Usage:</b>
+
+`b2p --hash-file="Big_Buck_Bunny.torrent" --save-path="/tmp"`
 
 # b2p-hook
 
-Lua script for mpv 
+Lua script for mpv
+
+<b>Installation: </b> 
+
+Copy `b2p-hook.lua` into `~/.config/mpv/scripts/`
 
 <b>Configuration: </b>
 
