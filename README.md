@@ -14,6 +14,11 @@ Fork of http://www.beroal.in.ua/prg/bittorrent2player/
 
 `b2p --hash-file="Big_Buck_Bunny.torrent" --save-path="/tmp"`
 
+To play with vlc
+
+`vlc http://localhost:17580` 
+
+
 # b2p-hook
 
 Lua script for mpv
